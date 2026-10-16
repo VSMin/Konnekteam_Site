@@ -1,0 +1,27 @@
+name: hoster-dist
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.5
+      - run: bun install --frozen-lockfile
+      - run: cd packages/web && bun run build
+      - name: Publish dist to hoster-dist
+        run: |
+          cd packages/web/dist
+          printf 'Options -MultiViews\nRewriteEngine On\nRewriteCond %%{REQUEST_FILENAME} !-f\nRewriteCond %%{REQUEST_FILENAME} !-d\nRewriteRule ^ /index.html [L]\n' > .htaccess
+          git init -q -b hoster-dist
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -qm "Build ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" hoster-dist:hoster-dist
