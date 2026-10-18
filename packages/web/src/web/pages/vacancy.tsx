@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { SEO, PageLayout, ESPO_LEAD_CAPTURE_URL } from "../components/layout";
+import { notifySite } from "../lib/notify";
 
 // Приёмник анкет в EspoCRM. Сейчас общий с формой заявок.
 // Когда создадите отдельный Lead Capture «Вакансия», вставьте сюда его URL в кавычках.
@@ -169,6 +170,9 @@ export default function VacancyPage() {
       QUESTIONS.map((q, i) => `${i + 1}. ${q.label}\nВопрос: ${q.question}\nОтвет: ${answers[q.id]}`).join("\n\n---\n\n");
 
     try {
+      notifySite("Анкета на вакансию: Менеджер по продажам B2B",
+        `ФИО: ${info.name}\nТелефон: ${info.phone}\nРезюме: ${info.resume}\n\n` +
+        QUESTIONS.map((q, i) => `${i + 1}. ${q.label}\n${answers[q.id]}`).join("\n\n"));
       // Анкета уходит в EspoCRM (Lead Capture), без сторонних сервисов.
       const nameParts = info.name.trim().split(/\s+/);
       const res = await fetch(ESPO_VACANCY_CAPTURE_URL, {

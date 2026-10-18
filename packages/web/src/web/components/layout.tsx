@@ -2,6 +2,7 @@ import { useContext, useEffect, useLayoutEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { COMPANY, SERVICES } from "../lib/data";
 import { SSRHeadContext } from "../lib/seo";
+import { notifySite } from "../lib/notify";
 
 // ── SEO ────────────────────────────────────────────────────────────────────────
 interface SEOProps {
@@ -434,6 +435,12 @@ export function ContactForm({ defaultService = "" }: { defaultService?: string }
     ].filter(Boolean).join("\n");
 
     try {
+      notifySite("Заявка с сайта", [
+        `Имя: ${form.name}`,
+        `Телефон: ${form.phone}`,
+        form.company ? `Компания: ${form.company}` : "",
+        description,
+      ].filter(Boolean).join("\n"));
       const res = await fetch(ESPO_LEAD_CAPTURE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
