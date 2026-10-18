@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ParticleCanvas } from "../components/particle-canvas";
 import { Navbar, ESPO_LEAD_CAPTURE_URL } from "../components/layout";
+import { notifySite } from "../lib/notify";
 
 type Status = "loading" | "client" | "guest";
 type Phase = "idle" | "ping" | "download" | "upload" | "done";
@@ -367,6 +368,8 @@ function GuestView() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    notifySite("Заявка со страницы Speedtest",
+      `Имя: ${form.name}\nТелефон: ${form.phone}\nАдрес подключения: ${form.address}`);
     // Заявка со страницы Speedtest уходит в EspoCRM.
     const parts = form.name.trim().split(/\s+/);
     try {

@@ -19,3 +19,6 @@ jobs:
           if grep -rniE "web3forms|runablehq|access_key|turso|password\s*[:=]" packages/web/src packages/web/public package.json packages/web/package.json; then
             echo "Найдено запрещённое — уберите перед merge"; exit 1
           fi
+          if grep -rnE "[0-9]{8,10}:[A-Za-z0-9_-]{35}" --exclude-dir=node_modules --exclude-dir=.git .; then
+            echo "Похоже на токен Telegram-бота — удалите его из репозитория"; exit 1
+          fi
