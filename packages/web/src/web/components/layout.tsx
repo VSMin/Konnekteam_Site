@@ -402,7 +402,7 @@ export function PageLayout({ children }: { children: React.ReactNode }) {
 // URL приёмника EspoCRM Lead Capture. Это ключ «только на запись» —
 // он может лишь создавать заявки и не даёт доступа к данным CRM,
 // поэтому его безопасно держать во фронтенде.
-const ESPO_LEAD_CAPTURE_URL =
+export const ESPO_LEAD_CAPTURE_URL =
   "https://crm.konnekteam.kz/api/v1/LeadCapture/ac3da7a407494f0c916fa6c94c7bbe40";
 
 // ── Contact form (reused across pages) ────────────────────────────────────────

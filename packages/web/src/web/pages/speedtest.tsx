@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ParticleCanvas } from "../components/particle-canvas";
-import { Navbar } from "../components/layout";
+import { Navbar, ESPO_LEAD_CAPTURE_URL } from "../components/layout";
 
 type Status = "loading" | "client" | "guest";
 type Phase = "idle" | "ping" | "download" | "upload" | "done";
@@ -365,10 +365,27 @@ function GuestView() {
     return () => { clearTimeout(t1); cancelAnimationFrame(animId); };
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: EspoCRM
-    setSubmitted(true);
+    // Заявка со страницы Speedtest уходит в EspoCRM.
+    const parts = form.name.trim().split(/\s+/);
+    try {
+      const res = await fetch(ESPO_LEAD_CAPTURE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: parts.shift() ?? "",
+          lastName: parts.join(" "),
+          phoneNumber: form.phone,
+          description: `Заявка со страницы Speedtest\nАдрес подключения: ${form.address}`,
+          source: "Web",
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setSubmitted(true);
+    } catch {
+      alert("Не удалось отправить заявку. Позвоните нам или напишите в WhatsApp.");
+    }
   };
 
   const isBlocked = phase === "blocked";
@@ -507,7 +524,7 @@ export default function SpeedtestPage() {
   const [status, setStatus] = useState<Status>("loading");
 
   useEffect(() => {
-    fetch("/api/check-client-ip")
+    fetch("/api/check-client-ip.php")
       .then(r => r.json())
       .then((d: { client: boolean }) => setStatus(d.client ? "client" : "guest"))
       .catch(() => setStatus("guest"));

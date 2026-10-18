@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { SEO, PageLayout } from "../components/layout";
+import { SEO, PageLayout, ESPO_LEAD_CAPTURE_URL } from "../components/layout";
+
+// Приёмник анкет в EspoCRM. Сейчас общий с формой заявок.
+// Когда создадите отдельный Lead Capture «Вакансия», вставьте сюда его URL в кавычках.
+const ESPO_VACANCY_CAPTURE_URL = ESPO_LEAD_CAPTURE_URL;
 
 const QUESTIONS = [
   {
@@ -165,16 +169,17 @@ export default function VacancyPage() {
       QUESTIONS.map((q, i) => `${i + 1}. ${q.label}\nВопрос: ${q.question}\nОтвет: ${answers[q.id]}`).join("\n\n---\n\n");
 
     try {
-      const res = await fetch("https://api.web3forms.com/submit", {
+      // Анкета уходит в EspoCRM (Lead Capture), без сторонних сервисов.
+      const nameParts = info.name.trim().split(/\s+/);
+      const res = await fetch(ESPO_VACANCY_CAPTURE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          access_key: "eaa2633d-7b04-4bb0-90e4-cc3f489804f2",
-          subject: `Анкета кандидата — Менеджер B2B: ${info.name}`,
-          from_name: info.name,
-          replyto: "noreply@konnekteam.kz",
-          to: "sales@konnekteam.kz",
-          message: body,
+          lastName: nameParts[0] ?? "",
+          firstName: nameParts.slice(1).join(" "),
+          phoneNumber: info.phone,
+          description: `Вакансия: Менеджер по продажам B2B\n\n${body}`,
+          source: "Web",
         }),
       });
       if (res.ok) {
