@@ -1,0 +1,21 @@
+name: check
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  pr-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.5
+      - run: bun install
+      - run: cd packages/web && bun run build
+      - name: Нет ключей и сторонних трекеров
+        run: |
+          if grep -rniE "web3forms|runablehq|access_key|turso|password\s*[:=]" packages/web/src packages/web/public package.json packages/web/package.json; then
+            echo "Найдено запрещённое — уберите перед merge"; exit 1
+          fi
