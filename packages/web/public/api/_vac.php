@@ -6,6 +6,8 @@ date_default_timezone_set('Asia/Oral');
 
 const VAC_SITE = 'https://konnekteam.kz';
 const VAC_TTL = 60;
+// Значения списка «Занятость» в CRM → подпись на сайте.
+const VAC_EMPLOYMENT_LABEL = ['empfull' => 'Полная занятость', 'emppart' => 'Частичная занятость', 'project' => 'Проектная работа', 'intern' => 'Стажировка'];
 const VAC_EMPLOYMENT = ['Полная занятость' => 'FULL_TIME', 'Частичная занятость' => 'PART_TIME', 'Проектная работа' => 'CONTRACTOR', 'Стажировка' => 'INTERN'];
 
 function vac_priv(): string { return dirname(__DIR__, 2) . '/private'; }
@@ -47,7 +49,7 @@ function vac_api(string $method, string $path, ?array $body = null): array {
 function vac_fetch(): ?array {
   $f = ['status', 'slug', 'location', 'employment', 'salary', 'tags', 'duties', 'requirements', 'conditions', 'requireHh', 'deadline'];
   $select = implode(',', array_merge(['id', 'name', 'description', 'createdAt', 'modifiedAt'], array_map('vac_a', $f)));
-  $where = [['type' => 'equals', 'attribute' => vac_a('status'), 'value' => 'Опубликована']];
+  $where = [['type' => 'equals', 'attribute' => vac_a('status'), 'value' => 'published']];
   [$code, $d] = vac_api('GET', vac_ent('vacancy') . '?' . http_build_query(['maxSize' => 50, 'orderBy' => 'createdAt', 'order' => 'desc', 'select' => $select, 'where' => $where]));
   if ($code !== 200 || !is_array($d)) return null;
   $byId = [];
@@ -59,9 +61,9 @@ function vac_fetch(): ?array {
     $byId[$r['id']] = [
       'id' => $r['id'], 'slug' => $slug, 'name' => trim((string)$r['name']),
       'location' => trim((string)vac_get($r, 'location')),
-      'employment' => trim((string)vac_get($r, 'employment')),
+      'employment' => VAC_EMPLOYMENT_LABEL[trim((string)vac_get($r, 'employment'))] ?? trim((string)vac_get($r, 'employment')),
       'salary' => trim((string)vac_get($r, 'salary')),
-      'tags' => vac_lines(vac_get($r, 'tags')),
+      'tags' => vac_lines(str_replace([',', ';'], "\n", (string)vac_get($r, 'tags'))),
       'description' => trim((string)($r['description'] ?? '')),
       'duties' => vac_lines(vac_get($r, 'duties')),
       'requirements' => vac_lines(vac_get($r, 'requirements')),
