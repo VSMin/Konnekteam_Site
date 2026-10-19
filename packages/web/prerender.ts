@@ -31,7 +31,6 @@ const routes: string[] = [
 	"/about",
 	"/blog",
 	"/contacts",
-	"/vacancy",
 	"/speedtest",
 	...SERVICES.map((s) => `/services/${s.slug}`),
 	...BLOG_POSTS.map((p) => `/blog/${p.slug}`),
@@ -112,12 +111,25 @@ for (const url of routes) {
 	console.log(`✓ ${url}  →  ${outPath}`);
 }
 
+// ── Шаблоны страниц вакансий ────────────────────────────────────────────────
+// Вакансии берутся из EspoCRM на лету: api/vacancy-page.php подставляет данные
+// в эти шаблоны. Поэтому /vacancy в обычный обход не входит.
+await mkdir(join(DIST, "_shell"), { recursive: true });
+for (const [url, file] of [["/vacancy", "vacancy-list.html"], ["/vacancy/_", "vacancy.html"]] as const) {
+	const { html, meta } = render(url);
+	const page = template
+		.replace(SEO_BLOCK, buildHead(meta, url))
+		.replace(ROOT_DIV, `<div id="root">${html}</div>`);
+	await writeFile(join(DIST, "_shell", file), page, "utf8");
+	console.log(`✓ шаблон ${url}  →  ${join(DIST, "_shell", file)}`);
+}
+
 // ── sitemap.xml ──────────────────────────────────────────────────────────────
 const today = new Date().toISOString().slice(0, 10);
 const sitemap =
 	`<?xml version="1.0" encoding="UTF-8"?>\n` +
 	`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-	routes
+	[...routes, "/vacancy"]
 		.map(
 			(u) =>
 				`  <url>\n    <loc>${SITE}${u}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n  </url>`,

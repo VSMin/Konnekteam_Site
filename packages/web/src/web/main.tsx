@@ -21,7 +21,8 @@ const rootEl = document.getElementById("root")!;
 
 // В продакшене #root уже содержит пререндеренную разметку → гидрируем её.
 // В dev (vite) разметки нет → обычный клиентский рендер. Так dev не ломается.
-if (rootEl.hasChildNodes()) {
+// data-csr: страницу вакансий собрал сервер (PHP) — рендерим заново, без гидрации.
+if (rootEl.hasChildNodes() && !rootEl.hasAttribute("data-csr")) {
 	hydrateRoot(rootEl, tree);
 } else {
 	createRoot(rootEl).render(tree);
