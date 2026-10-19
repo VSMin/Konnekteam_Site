@@ -108,7 +108,7 @@ export function Navbar() {
     { href: "/about", label: "О компании" },
     { href: "/blog", label: "Блог" },
     { href: "/contacts", label: "Контакты" },
-    { href: "/vacancy", label: "Вакансии" },
+    { href: "/vacancy", label: "Карьера" },
   ];
 
   const isActive = (href: string) =>
@@ -259,7 +259,7 @@ export function Footer() {
 
           <div>
             <div style={{ fontFamily: "Montserrat", fontWeight: 700, fontSize: "11px", letterSpacing: "2px", textTransform: "uppercase", color: "var(--text-secondary)", marginBottom: "20px" }}>Навигация</div>
-            {[["/" , "Главная"], ["/services", "Все услуги"], ["/about", "О компании"], ["/blog", "Блог"], ["/contacts", "Контакты"], ["/vacancy", "Вакансии"]].map(([href, label]) => (
+            {[["/" , "Главная"], ["/services", "Все услуги"], ["/about", "О компании"], ["/blog", "Блог"], ["/contacts", "Контакты"], ["/vacancy", "Карьера"]].map(([href, label]) => (
               <div key={href} style={{ marginBottom: "10px" }}>
                 <Link href={href}
                   style={{ color: "var(--text-muted)", fontSize: "14px", textDecoration: "none", transition: "color 0.3s" }}
