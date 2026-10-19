@@ -49,4 +49,5 @@ User-agent: bingbot
 Allow: /
 
 Sitemap: https://konnekteam.kz/sitemap.xml
+Sitemap: https://konnekteam.kz/sitemap-vacancies.xml
 Host: konnekteam.kz

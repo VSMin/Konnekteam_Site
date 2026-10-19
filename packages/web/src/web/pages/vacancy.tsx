@@ -1,695 +1,246 @@
-import { useState } from "react";
-import { SEO, PageLayout, ESPO_LEAD_CAPTURE_URL } from "../components/layout";
-import { notifySite } from "../lib/notify";
+import { useEffect, useState, type CSSProperties } from "react";
+import { Link } from "wouter";
+import { SEO, PageLayout } from "../components/layout";
+import { isServer, SERVER_SLOT, bootData, loadVacancy, loadVacancies, type Vacancy, type VacancySummary } from "../lib/vacancies";
+import { VacancyHero, VacancyInfo, VacancyNote, VacancyCards, vacancyMeta, vacancyPills } from "../components/vacancy-blocks";
 
-// Приёмник анкет в EspoCRM. Сейчас общий с формой заявок.
-// Когда создадите отдельный Lead Capture «Вакансия», вставьте сюда его URL в кавычках.
-const ESPO_VACANCY_CAPTURE_URL = ESPO_LEAD_CAPTURE_URL;
+// Страница одной вакансии. Текст, условия и вопросы анкеты задаются в EspoCRM (раздел «Вакансии»).
+export default function VacancyPage({ params }: { params: { slug?: string } }) {
+	const slug = (params.slug ?? "").toLowerCase();
+	const [vac, setVac] = useState<Vacancy | null | undefined>(() => {
+		if (isServer) return undefined;
+		const pre = bootData().vacancy;
+		return pre && pre.slug === slug ? pre : undefined;
+	});
+	const [failed, setFailed] = useState(false);
+	useEffect(() => {
+		if (vac && vac.slug === slug) return;
+		let alive = true;
+		setVac(undefined);
+		setFailed(false);
+		loadVacancy(slug).then((v) => { if (alive) setVac(v); }).catch(() => { if (alive) setFailed(true); });
+		return () => { alive = false; };
+	}, [slug]);
 
-const QUESTIONS = [
-  {
-    id: "q1",
-    label: "Кейс 1. Клиент отказывает «Нам ничего не нужно»",
-    question:
-      "Вы звоните директору производственной компании с предложением подключить корпоративный интернет с резервированием. Он говорит: «У нас уже всё есть, не тратьте моё время». Как вы продолжите разговор? Опишите ваши слова и логику.",
-  },
-  {
-    id: "q2",
-    label: "Кейс 2. Конкурент дешевле",
-    question:
-      "На финальных переговорах клиент говорит: «Ваши конкуренты предлагают то же самое на 20% дешевле. Почему я должен платить больше?» Что вы ответите и как обоснуете цену?",
-  },
-  {
-    id: "q3",
-    label: "Кейс 3. Затяжное согласование",
-    question:
-      "Сделка тянется 3 месяца: клиент говорит «подумаем», переносит встречи, не отвечает на письма. Счёт на 2 млн тенге. Как вы ускорите закрытие? Опишите конкретные шаги.",
-  },
-  {
-    id: "q4",
-    label: "Кейс 4. Несколько лиц, принимающих решение",
-    question:
-      "В компании клиента решение принимают: IT-директор (против смены провайдера), финансовый директор (хочет снизить затраты) и генеральный (нейтрален). Как выстроите работу с каждым из них?",
-  },
-  {
-    id: "q5",
-    label: "Кейс 5. Жалоба во время переговоров",
-    question:
-      "В середине презентации клиент говорит: «Я слышал, у вас были проблемы с интернетом у компании X — они неделю сидели без связи». Это правда. Как реагируете?",
-  },
-  {
-    id: "q6",
-    label: "Кейс 6. Бюджет не утверждён",
-    question:
-      "Клиент заинтересован, готов подписать, но говорит: «Бюджет на IT заморожен до следующего квартала». До конца месяца вам нужно закрыть план. Что делаете?",
-  },
-  {
-    id: "q7",
-    label: "Кейс 7. Тендер с подводными камнями",
-    question:
-      "Вы участвуете в тендере, но по условиям явно видно, что ТЗ написано под конкурента: требования очень специфичны. Участвуете или нет? Если да — как действуете?",
-  },
-  {
-    id: "q8",
-    label: "Кейс 8. Клиент хочет «попробовать»",
-    question:
-      "Крупный клиент говорит: «Давайте начнём с одного офиса, посмотрим — и тогда подключим все 5». Для вас выгодно сразу подключить всё. Как убедите его не дробить сделку?",
-  },
-  {
-    id: "q9",
-    label: "Кейс 9. Потерянный клиент",
-    question:
-      "Год назад клиент ушёл к конкуренту из-за технической проблемы. Сейчас у конкурента снова сбои. Вы звоните клиенту. Как начинаете разговор и что предлагаете?",
-  },
-  {
-    id: "q10",
-    label: "Кейс 10. Ваш реальный опыт",
-    question:
-      "Опишите самую сложную сделку в вашей практике: что было сложно, как вы её закрыли или почему не закрыли. Что вы из этого вынесли?",
-  },
-];
+	return (
+		<PageLayout>
+			<SEO
+				title={vac ? `Вакансия: ${vac.name}` : "Вакансия"}
+				description={vac ? describe(vac) : "Вакансия KONNEKTEAM в Уральске."}
+				keywords="вакансия Уральск, работа KONNEKTEAM"
+				canonical={`https://konnekteam.kz/vacancy/${slug}`}
+			/>
+			{isServer ? (
+				<div dangerouslySetInnerHTML={{ __html: SERVER_SLOT }} />
+			) : failed ? (
+				<><VacancyHero title="Вакансия" /><VacancyNote>Не удалось загрузить вакансию. Обновите страницу.</VacancyNote></>
+			) : vac === undefined ? (
+				<VacancyHero title="Загрузка…" />
+			) : vac === null ? (
+				<ClosedVacancy />
+			) : (
+				<>
+					<VacancyHero title={vac.name} sub={vacancyMeta(vac)} pills={vacancyPills(vac)} />
+					<VacancyInfo v={vac} />
+					<VacancyForm key={vac.slug} vac={vac} />
+				</>
+			)}
+		</PageLayout>
+	);
+}
+
+function describe(v: Vacancy) {
+	const first = v.description.split(/\r?\n/).map((s) => s.trim()).find(Boolean);
+	return (first || `${v.name} в KONNEKTEAM. Заполните анкету на сайте.`).slice(0, 160);
+}
+
+function ClosedVacancy() {
+	const [list, setList] = useState<VacancySummary[] | undefined>(() => bootData().list);
+	useEffect(() => {
+		if (!list) loadVacancies().then(setList).catch(() => setList([]));
+	}, []);
+	return (
+		<>
+			<VacancyHero title="Вакансия закрыта" sub="Эта вакансия закрыта или не найдена. Посмотрите открытые вакансии:" />
+			{list ? <VacancyCards list={list} /> : null}
+		</>
+	);
+}
 
 type Step = "info" | "questionnaire" | "success";
 
-function validateHHUrl(url: string): boolean {
-  try {
-    const u = new URL(url);
-    return (
-      (u.hostname === "hh.kz" || u.hostname === "www.hh.kz") &&
-      u.pathname.includes("resume")
-    );
-  } catch {
-    return false;
-  }
+const normalizePhone = (p: string) => p.replace(/[\s\-()+]/g, "");
+const isPhone = (p: string) => /^(7|8)\d{10}$/.test(normalizePhone(p));
+function isHhResume(url: string) {
+	try { const u = new URL(url); return /^(www\.)?hh\.kz$/.test(u.hostname) && u.pathname.includes("resume"); } catch { return false; }
+}
+function isUrl(url: string) {
+	try { return /^https?:$/.test(new URL(url).protocol); } catch { return false; }
 }
 
-function normalizePhone(phone: string): string {
-  return phone.replace(/[\s\-\(\)\+]/g, "");
-}
+const inputStyle: CSSProperties = {
+	width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10,
+	padding: "14px 16px", color: "#fff", fontSize: "1rem", outline: "none", boxSizing: "border-box", transition: "border-color 0.2s", fontFamily: "inherit",
+};
+const errorStyle: CSSProperties = { color: "#ff6b6b", fontSize: "0.82rem", marginTop: 6 };
+const labelStyle: CSSProperties = { display: "block", marginBottom: 8, fontSize: "0.9rem", color: "rgba(255,255,255,0.7)" };
+const hintStyle: CSSProperties = { marginTop: 6, fontSize: "0.78rem", color: "rgba(255,255,255,0.35)" };
+const primaryBtn: CSSProperties = { padding: "14px 32px", border: "none", cursor: "pointer", fontSize: "1rem", fontWeight: 700 };
+const ghostBtn: CSSProperties = { padding: "14px 24px", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, color: "#fff", cursor: "pointer", fontSize: "0.95rem" };
+const bad = (on: boolean): CSSProperties => ({ ...inputStyle, borderColor: on ? "#ff6b6b" : "rgba(255,255,255,0.15)" });
 
-function validatePhone(phone: string): boolean {
-  const normalized = normalizePhone(phone);
-  return /^(7|8)\d{10}$/.test(normalized);
-}
+function VacancyForm({ vac }: { vac: Vacancy }) {
+	const qs = vac.questions;
+	const [step, setStep] = useState<Step>("info");
+	const [current, setCurrent] = useState(0);
+	const [sending, setSending] = useState(false);
+	const [errors, setErrors] = useState<Record<string, string>>({});
+	const [info, setInfo] = useState({ name: "", phone: "", resume: "" });
+	// Антиспам: боты заполняют скрытое поле и отправляют анкету мгновенно (проверяет и сервер).
+	const [hp, setHp] = useState("");
+	const [startedAt] = useState(() => Date.now());
+	const [answers, setAnswers] = useState<string[]>(() => qs.map(() => ""));
 
-export default function VacancyPage() {
-  const [step, setStep] = useState<Step>("info");
-  const [current, setCurrent] = useState(0);
-  const [sending, setSending] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+	const toForm = () => {
+		const el = document.getElementById("anketa");
+		window.scrollTo({ top: el ? el.getBoundingClientRect().top + window.scrollY - 90 : 0, behavior: "smooth" });
+	};
 
-  const [info, setInfo] = useState({ name: "", phone: "", resume: "" });
-  // Антиспам: боты заполняют скрытое поле и отправляют анкету мгновенно.
-  const [hp, setHp] = useState("");
-  const [startedAt] = useState(() => Date.now());
-  const [answers, setAnswers] = useState<Record<string, string>>(
-    Object.fromEntries(QUESTIONS.map((q) => [q.id, ""]))
-  );
+	function validateInfo() {
+		const e: Record<string, string> = {};
+		if (info.name.trim().split(/\s+/).length < 2) e.name = "Введите полное ФИО (минимум два слова)";
+		if (!isPhone(info.phone)) e.phone = "Введите корректный казахстанский номер";
+		const r = info.resume.trim();
+		if (vac.requireHh ? !isHhResume(r) : r !== "" && !isUrl(r))
+			e.resume = vac.requireHh ? "Ссылка должна быть на резюме hh.kz (например: https://hh.kz/resume/...)" : "Проверьте ссылку: она должна начинаться с https://";
+		setErrors(e);
+		return Object.keys(e).length === 0;
+	}
 
-  const accent = "var(--accent, #00C8FF)";
+	function answerOk(i: number) {
+		const min = qs[i].minLength;
+		if (answers[i].trim().length < min) {
+			setErrors({ answer: `Пожалуйста, дайте развёрнутый ответ (минимум ${min} символов)` });
+			return false;
+		}
+		setErrors({});
+		return true;
+	}
 
-  // --- Step 1 validation ---
-  function validateInfo() {
-    const e: Record<string, string> = {};
-    if (!info.name.trim() || info.name.trim().split(" ").length < 2)
-      e.name = "Введите полное ФИО (минимум два слова)";
-    if (!validatePhone(info.phone))
-      e.phone = "Введите корректный казахстанский номер";
-    if (!validateHHUrl(info.resume))
-      e.resume = "Ссылка должна быть на резюме hh.kz (например: https://hh.kz/resume/...)";
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  }
+	function onInfoNext() {
+		if (!validateInfo()) return;
+		if (qs.length) { setStep("questionnaire"); setCurrent(0); toForm(); } else void submit();
+	}
+	function onNext() { if (answerOk(current)) { setCurrent((c) => c + 1); toForm(); } }
+	function onPrev() {
+		setErrors({});
+		if (current > 0) setCurrent((c) => c - 1); else setStep("info");
+		toForm();
+	}
 
-  function handleInfoNext() {
-    if (validateInfo()) setStep("questionnaire");
-  }
+	async function submit() {
+		if (qs.length && !answerOk(current)) return;
+		setSending(true);
+		try {
+			const res = await fetch("/api/candidate.php", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ slug: vac.slug, name: info.name.trim(), phone: normalizePhone(info.phone), resume: info.resume.trim(), answers, hp, elapsed: Date.now() - startedAt }),
+			});
+			const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+			if (res.ok && data.ok) { setStep("success"); toForm(); }
+			else alert(data.error || "Ошибка отправки. Попробуйте ещё раз или позвоните нам.");
+		} catch {
+			alert("Нет соединения. Проверьте интернет и попробуйте снова.");
+		} finally {
+			setSending(false);
+		}
+	}
 
-  // --- Answer change ---
-  function handleAnswer(id: string, val: string) {
-    setAnswers((prev) => ({ ...prev, [id]: val }));
-  }
+	const q = qs[current];
+	const progress = step === "info" ? 2 : ((current + 1) / Math.max(qs.length, 1)) * 100;
+	const parts = info.name.trim().split(/\s+/);
 
-  // --- Navigation ---
-  function handleNext() {
-    if (answers[QUESTIONS[current].id].trim().length < 20) {
-      setErrors({ [QUESTIONS[current].id]: "Пожалуйста, дайте развёрнутый ответ (минимум 20 символов)" });
-      return;
-    }
-    setErrors({});
-    if (current < QUESTIONS.length - 1) {
-      setCurrent((c) => c + 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  }
+	return (
+		<section id="anketa" style={{ padding: "20px 24px 100px", background: "#0A0A0A" }}>
+			<div style={{ maxWidth: 720, margin: "0 auto" }}>
+				{step !== "success" && (
+					<div style={{ marginBottom: 40 }}>
+						<h2 style={{ fontSize: "1.4rem", fontWeight: 700, marginBottom: 24 }}>Анкета кандидата</h2>
+						<div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>
+							<span>{step === "info" ? (qs.length ? "Шаг 1 из 2 — Ваши данные" : "Ваши данные") : `Шаг 2 из 2 — Вопрос ${current + 1} из ${qs.length}`}</span>
+							<span>{step === "info" ? "0%" : `${Math.round(progress)}%`}</span>
+						</div>
+						<div style={{ height: 4, background: "rgba(255,255,255,0.1)", borderRadius: 2, overflow: "hidden" }}>
+							<div style={{ height: "100%", width: `${progress}%`, background: "var(--accent)", borderRadius: 2, transition: "width 0.4s ease" }} />
+						</div>
+					</div>
+				)}
 
-  function handlePrev() {
-    setErrors({});
-    if (current > 0) setCurrent((c) => c - 1);
-    else setStep("info");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
+				{step === "info" && (
+					<div style={{ display: "flex", flexDirection: "column", gap: 20, position: "relative" }}>
+						<input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" value={hp} onChange={(e) => setHp(e.target.value)}
+							style={{ position: "absolute", left: "-9999px", width: "1px", height: "1px", opacity: 0 }} />
+						<div>
+							<label style={labelStyle}>ФИО *</label>
+							<input style={bad(!!errors.name)} placeholder="Иванов Иван Иванович" value={info.name} onChange={(e) => setInfo((p) => ({ ...p, name: e.target.value }))} />
+							{errors.name && <div style={errorStyle}>{errors.name}</div>}
+						</div>
+						<div>
+							<label style={labelStyle}>Телефон *</label>
+							<input style={bad(!!errors.phone)} placeholder="+7 700 000 00 00" type="tel" value={info.phone} onChange={(e) => setInfo((p) => ({ ...p, phone: e.target.value }))} />
+							{errors.phone && <div style={errorStyle}>{errors.phone}</div>}
+						</div>
+						<div>
+							<label style={labelStyle}>{vac.requireHh ? "Ссылка на резюме на hh.kz *" : "Ссылка на резюме (необязательно)"}</label>
+							<input style={bad(!!errors.resume)} placeholder={vac.requireHh ? "https://hh.kz/resume/xxxxxxxxxxxxxxxx" : "https://"} type="url" value={info.resume} onChange={(e) => setInfo((p) => ({ ...p, resume: e.target.value }))} />
+							{errors.resume && <div style={errorStyle}>{errors.resume}</div>}
+							<div style={hintStyle}>Убедитесь, что резюме открывается по ссылке без авторизации</div>
+						</div>
+						<button className="btn-primary" onClick={onInfoNext} disabled={sending} style={{ ...primaryBtn, marginTop: 12, alignSelf: "flex-start", opacity: sending ? 0.6 : 1 }}>
+							{qs.length ? "Далее — пройти анкету →" : sending ? "Отправка..." : "Отправить анкету"}
+						</button>
+					</div>
+				)}
 
-  // --- Submit ---
-  async function handleSubmit() {
-    const last = answers[QUESTIONS[current].id];
-    if (last.trim().length < 20) {
-      setErrors({ [QUESTIONS[current].id]: "Пожалуйста, дайте развёрнутый ответ (минимум 20 символов)" });
-      return;
-    }
-    setErrors({});
-    // Бот: показываем «успех», письмо не отправляем.
-    if (hp || Date.now() - startedAt < 30000) {
-      setStep("success");
-      return;
-    }
-    setSending(true);
+				{step === "questionnaire" && q && (
+					<div>
+						<div style={{ background: "rgba(227,30,36,0.05)", border: "1px solid rgba(227,30,36,0.2)", borderRadius: 14, padding: "28px 28px 32px" }}>
+							{q.label ? <div style={{ color: "var(--accent)", fontSize: "0.8rem", letterSpacing: 1, textTransform: "uppercase", marginBottom: 16, fontWeight: 600 }}>{q.label}</div> : null}
+							<p style={{ fontSize: "1.05rem", lineHeight: 1.75, color: "rgba(255,255,255,0.85)", marginBottom: 28, whiteSpace: "pre-line" }}>{q.question}</p>
+							<textarea style={{ ...bad(!!errors.answer), minHeight: 180, resize: "vertical" }} placeholder="Ваш ответ…" value={answers[current]}
+								onChange={(e) => { const v = e.target.value; setAnswers((a) => a.map((x, i) => (i === current ? v : x))); }} />
+							{errors.answer && <div style={errorStyle}>{errors.answer}</div>}
+							<div style={hintStyle}>{answers[current].length} символов</div>
+						</div>
+						<div style={{ display: "flex", gap: 12, marginTop: 24, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
+							<button onClick={onPrev} style={ghostBtn}>← Назад</button>
+							{current < qs.length - 1 ? (
+								<button className="btn-primary" onClick={onNext} style={primaryBtn}>Следующий вопрос →</button>
+							) : (
+								<button className="btn-primary" onClick={() => void submit()} disabled={sending} style={{ ...primaryBtn, opacity: sending ? 0.6 : 1, cursor: sending ? "not-allowed" : "pointer" }}>
+									{sending ? "Отправка..." : "Отправить анкету ✓"}
+								</button>
+							)}
+						</div>
+						<div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 24, flexWrap: "wrap" }}>
+							{qs.map((_, i) => (
+								<div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: i < current ? "var(--accent)" : i === current ? "#fff" : "rgba(255,255,255,0.2)", transition: "background 0.3s" }} />
+							))}
+						</div>
+					</div>
+				)}
 
-    const body =
-      `ФИО: ${info.name}\nТелефон: ${normalizePhone(info.phone)}\nРезюме: ${info.resume}\n\n` +
-      QUESTIONS.map((q, i) => `${i + 1}. ${q.label}\nВопрос: ${q.question}\nОтвет: ${answers[q.id]}`).join("\n\n---\n\n");
-
-    try {
-      notifySite("Анкета на вакансию: Менеджер по продажам B2B",
-        `ФИО: ${info.name}\nТелефон: ${info.phone}\nРезюме: ${info.resume}\n\n` +
-        QUESTIONS.map((q, i) => `${i + 1}. ${q.label}\n${answers[q.id]}`).join("\n\n"));
-      // Анкета уходит в EspoCRM (Lead Capture), без сторонних сервисов.
-      const nameParts = info.name.trim().split(/\s+/);
-      const res = await fetch(ESPO_VACANCY_CAPTURE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lastName: nameParts[0] ?? "",
-          firstName: nameParts.slice(1).join(" "),
-          phoneNumber: info.phone,
-          description: `Вакансия: Менеджер по продажам B2B\n\n${body}`,
-          source: "Web",
-        }),
-      });
-      if (res.ok) {
-        setStep("success");
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      } else {
-        alert("Ошибка отправки. Попробуйте ещё раз.");
-      }
-    } catch {
-      alert("Нет соединения. Проверьте интернет и попробуйте снова.");
-    } finally {
-      setSending(false);
-    }
-  }
-
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    background: "rgba(255,255,255,0.05)",
-    border: "1px solid rgba(255,255,255,0.15)",
-    borderRadius: 10,
-    padding: "14px 16px",
-    color: "#fff",
-    fontSize: "1rem",
-    outline: "none",
-    boxSizing: "border-box",
-    transition: "border-color 0.2s",
-    fontFamily: "inherit",
-  };
-
-  const errorStyle: React.CSSProperties = {
-    color: "#ff6b6b",
-    fontSize: "0.82rem",
-    marginTop: 6,
-  };
-
-  const progress = step === "info" ? 0 : ((current + 1) / QUESTIONS.length) * 100;
-
-  return (
-    <PageLayout>
-      <SEO
-        title="Вакансия — Менеджер по продажам B2B"
-        description="Открытая вакансия в KONNEKTEAM: менеджер по продажам B2B. Пройдите анкету — ответьте на 10 кейсов из реальной практики продаж."
-        keywords="вакансия менеджер продаж B2B Уральск, KONNEKTEAM работа, IT продажи Казахстан"
-        canonical="https://konnekteam.kz/vacancy"
-      />
-
-      {/* Hero */}
-      <section
-        style={{
-          paddingTop: 140,
-          paddingBottom: 60,
-          paddingLeft: 24,
-          paddingRight: 24,
-          background: "#0A0A0A",
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            color: accent,
-            fontSize: "0.85rem",
-            letterSpacing: 2,
-            textTransform: "uppercase",
-            marginBottom: 12,
-          }}
-        >
-          Карьера в KONNEKTEAM
-        </div>
-        <h1
-          style={{
-            fontSize: "clamp(1.8rem, 4vw, 2.8rem)",
-            fontWeight: 800,
-            marginBottom: 20,
-            lineHeight: 1.2,
-          }}
-        >
-          Менеджер по продажам B2B
-        </h1>
-        <p
-          style={{
-            color: "rgba(255,255,255,0.6)",
-            maxWidth: 560,
-            margin: "0 auto 32px",
-            lineHeight: 1.7,
-          }}
-        >
-          Уральск · Офис / выезды · Полная занятость
-        </p>
-
-        {/* Job info pills */}
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            justifyContent: "center",
-            flexWrap: "wrap",
-            marginBottom: 0,
-          }}
-        >
-          {["Оклад + %", "KPI-бонусы", "Корпоративная связь", "Обучение продуктам"].map((t) => (
-            <span
-              key={t}
-              style={{
-                background: "rgba(0,200,255,0.08)",
-                border: "1px solid rgba(0,200,255,0.2)",
-                borderRadius: 20,
-                padding: "6px 16px",
-                fontSize: "0.85rem",
-                color: accent,
-              }}
-            >
-              {t}
-            </span>
-          ))}
-        </div>
-      </section>
-
-      {/* Main content */}
-      <section
-        style={{ padding: "0 24px 100px", background: "#0A0A0A" }}
-      >
-        <div style={{ maxWidth: 720, margin: "0 auto" }}>
-
-          {/* Progress bar */}
-          {step !== "success" && (
-            <div style={{ marginBottom: 40 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: "0.8rem",
-                  color: "rgba(255,255,255,0.4)",
-                  marginBottom: 8,
-                }}
-              >
-                <span>
-                  {step === "info"
-                    ? "Шаг 1 из 2 — Ваши данные"
-                    : `Шаг 2 из 2 — Кейс ${current + 1} из ${QUESTIONS.length}`}
-                </span>
-                <span>{step === "info" ? "0%" : `${Math.round(progress)}%`}</span>
-              </div>
-              <div
-                style={{
-                  height: 4,
-                  background: "rgba(255,255,255,0.1)",
-                  borderRadius: 2,
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    height: "100%",
-                    width: step === "info" ? "2%" : `${progress}%`,
-                    background: accent,
-                    borderRadius: 2,
-                    transition: "width 0.4s ease",
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* ===== STEP 1: Personal Info ===== */}
-          {step === "info" && (
-            <div>
-              <h2
-                style={{ fontSize: "1.4rem", fontWeight: 700, marginBottom: 8 }}
-              >
-                Ваши контактные данные
-              </h2>
-              <p
-                style={{
-                  color: "rgba(255,255,255,0.5)",
-                  marginBottom: 32,
-                  lineHeight: 1.6,
-                }}
-              >
-                Перед прохождением анкеты заполните данные о себе. Ссылка на
-                резюме нужна для первичной проверки опыта.
-              </p>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 20, position: "relative" }}>
-                {/* Поле-ловушка для ботов: людям не видно */}
-                <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"
-                  value={hp} onChange={(e) => setHp(e.target.value)}
-                  style={{ position: "absolute", left: "-9999px", width: "1px", height: "1px", opacity: 0 }} />
-                {/* Name */}
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: 8,
-                      fontSize: "0.9rem",
-                      color: "rgba(255,255,255,0.7)",
-                    }}
-                  >
-                    ФИО *
-                  </label>
-                  <input
-                    style={{
-                      ...inputStyle,
-                      borderColor: errors.name
-                        ? "#ff6b6b"
-                        : "rgba(255,255,255,0.15)",
-                    }}
-                    placeholder="Иванов Иван Иванович"
-                    value={info.name}
-                    onChange={(e) =>
-                      setInfo((p) => ({ ...p, name: e.target.value }))
-                    }
-                  />
-                  {errors.name && <div style={errorStyle}>{errors.name}</div>}
-                </div>
-
-                {/* Phone */}
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: 8,
-                      fontSize: "0.9rem",
-                      color: "rgba(255,255,255,0.7)",
-                    }}
-                  >
-                    Телефон *
-                  </label>
-                  <input
-                    style={{
-                      ...inputStyle,
-                      borderColor: errors.phone
-                        ? "#ff6b6b"
-                        : "rgba(255,255,255,0.15)",
-                    }}
-                    placeholder="+7 700 000 00 00"
-                    value={info.phone}
-                    onChange={(e) =>
-                      setInfo((p) => ({ ...p, phone: e.target.value }))
-                    }
-                    type="tel"
-                  />
-                  {errors.phone && <div style={errorStyle}>{errors.phone}</div>}
-                </div>
-
-                {/* Resume */}
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: 8,
-                      fontSize: "0.9rem",
-                      color: "rgba(255,255,255,0.7)",
-                    }}
-                  >
-                    Ссылка на резюме на hh.kz *
-                  </label>
-                  <input
-                    style={{
-                      ...inputStyle,
-                      borderColor: errors.resume
-                        ? "#ff6b6b"
-                        : "rgba(255,255,255,0.15)",
-                    }}
-                    placeholder="https://hh.kz/resume/xxxxxxxxxxxxxxxx"
-                    value={info.resume}
-                    onChange={(e) =>
-                      setInfo((p) => ({ ...p, resume: e.target.value }))
-                    }
-                    type="url"
-                  />
-                  {errors.resume && (
-                    <div style={errorStyle}>{errors.resume}</div>
-                  )}
-                  <div
-                    style={{
-                      marginTop: 6,
-                      fontSize: "0.78rem",
-                      color: "rgba(255,255,255,0.35)",
-                    }}
-                  >
-                    Убедитесь, что резюме открыто по ссылке без авторизации
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleInfoNext}
-                  style={{
-                    marginTop: 12,
-                    padding: "16px 32px",
-                    background: accent,
-                    color: "#000",
-                    border: "none",
-                    borderRadius: 10,
-                    fontWeight: 700,
-                    fontSize: "1rem",
-                    cursor: "pointer",
-                    alignSelf: "flex-start",
-                  }}
-                >
-                  Далее — Пройти анкету →
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ===== STEP 2: Questions ===== */}
-          {step === "questionnaire" && (
-            <div>
-              <div
-                style={{
-                  background: "rgba(0,200,255,0.05)",
-                  border: "1px solid rgba(0,200,255,0.15)",
-                  borderRadius: 14,
-                  padding: "28px 28px 32px",
-                }}
-              >
-                <div
-                  style={{
-                    color: accent,
-                    fontSize: "0.8rem",
-                    letterSpacing: 1,
-                    textTransform: "uppercase",
-                    marginBottom: 16,
-                    fontWeight: 600,
-                  }}
-                >
-                  {QUESTIONS[current].label}
-                </div>
-                <p
-                  style={{
-                    fontSize: "1.05rem",
-                    lineHeight: 1.75,
-                    color: "rgba(255,255,255,0.85)",
-                    marginBottom: 28,
-                  }}
-                >
-                  {QUESTIONS[current].question}
-                </p>
-
-                <textarea
-                  style={{
-                    ...inputStyle,
-                    minHeight: 180,
-                    resize: "vertical",
-                    borderColor: errors[QUESTIONS[current].id]
-                      ? "#ff6b6b"
-                      : "rgba(255,255,255,0.15)",
-                  }}
-                  placeholder="Опишите ваши действия, слова и логику подробно..."
-                  value={answers[QUESTIONS[current].id]}
-                  onChange={(e) =>
-                    handleAnswer(QUESTIONS[current].id, e.target.value)
-                  }
-                />
-                {errors[QUESTIONS[current].id] && (
-                  <div style={errorStyle}>
-                    {errors[QUESTIONS[current].id]}
-                  </div>
-                )}
-                <div
-                  style={{
-                    marginTop: 6,
-                    fontSize: "0.78rem",
-                    color: "rgba(255,255,255,0.3)",
-                  }}
-                >
-                  {answers[QUESTIONS[current].id].length} символов
-                </div>
-              </div>
-
-              {/* Navigation */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: 12,
-                  marginTop: 24,
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <button
-                  onClick={handlePrev}
-                  style={{
-                    padding: "14px 24px",
-                    background: "rgba(255,255,255,0.07)",
-                    border: "1px solid rgba(255,255,255,0.15)",
-                    borderRadius: 10,
-                    color: "#fff",
-                    cursor: "pointer",
-                    fontSize: "0.95rem",
-                  }}
-                >
-                  ← Назад
-                </button>
-
-                {current < QUESTIONS.length - 1 ? (
-                  <button
-                    onClick={handleNext}
-                    style={{
-                      padding: "14px 32px",
-                      background: accent,
-                      color: "#000",
-                      border: "none",
-                      borderRadius: 10,
-                      fontWeight: 700,
-                      fontSize: "1rem",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Следующий кейс →
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleSubmit}
-                    disabled={sending}
-                    style={{
-                      padding: "14px 32px",
-                      background: sending ? "rgba(0,200,255,0.4)" : accent,
-                      color: "#000",
-                      border: "none",
-                      borderRadius: 10,
-                      fontWeight: 700,
-                      fontSize: "1rem",
-                      cursor: sending ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    {sending ? "Отправка..." : "Отправить анкету ✓"}
-                  </button>
-                )}
-              </div>
-
-              {/* Dots */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: 6,
-                  justifyContent: "center",
-                  marginTop: 24,
-                  flexWrap: "wrap",
-                }}
-              >
-                {QUESTIONS.map((_, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background:
-                        i < current
-                          ? accent
-                          : i === current
-                          ? "#fff"
-                          : "rgba(255,255,255,0.2)",
-                      transition: "background 0.3s",
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ===== SUCCESS ===== */}
-          {step === "success" && (
-            <div style={{ textAlign: "center", paddingTop: 40 }}>
-              <div style={{ fontSize: "3.5rem", marginBottom: 24 }}>✅</div>
-              <h2
-                style={{
-                  fontSize: "1.8rem",
-                  fontWeight: 800,
-                  marginBottom: 16,
-                }}
-              >
-                Анкета отправлена!
-              </h2>
-              <p
-                style={{
-                  color: "rgba(255,255,255,0.6)",
-                  lineHeight: 1.7,
-                  maxWidth: 480,
-                  margin: "0 auto 32px",
-                }}
-              >
-                Мы получили ваши ответы и свяжемся с вами по номеру{" "}
-                <strong style={{ color: "#fff" }}>{info.phone}</strong> в
-                течение 3 рабочих дней. Удачи, {info.name.split(" ")[0]}!
-              </p>
-              <a
-                href="/"
-                style={{
-                  display: "inline-block",
-                  padding: "14px 32px",
-                  background: accent,
-                  color: "#000",
-                  borderRadius: 10,
-                  fontWeight: 700,
-                  textDecoration: "none",
-                  fontSize: "1rem",
-                }}
-              >
-                На главную
-              </a>
-            </div>
-          )}
-        </div>
-      </section>
-    </PageLayout>
-  );
+				{step === "success" && (
+					<div style={{ textAlign: "center", paddingTop: 40 }}>
+						<h2 style={{ fontSize: "1.8rem", fontWeight: 800, marginBottom: 16 }}>Анкета отправлена!</h2>
+						<p style={{ color: "rgba(255,255,255,0.6)", lineHeight: 1.7, maxWidth: 480, margin: "0 auto 32px" }}>
+							Мы получили вашу анкету на вакансию «{vac.name}» и свяжемся с вами по номеру <strong style={{ color: "#fff" }}>{info.phone}</strong> в течение 3 рабочих дней. Удачи, {parts[1] ?? parts[0]}!
+						</p>
+						<Link href="/vacancy" className="btn-primary" style={{ textDecoration: "none", display: "inline-block" }}>Все вакансии</Link>
+					</div>
+				)}
+			</div>
+		</section>
+	);
 }

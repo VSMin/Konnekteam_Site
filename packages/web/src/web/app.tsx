@@ -9,6 +9,7 @@ import BlogPage from "./pages/blog";
 import ContactPage from "./pages/contact";
 import NotFoundPage from "./pages/not-found";
 import VacancyPage from "./pages/vacancy";
+import VacanciesPage from "./pages/vacancies";
 import SpeedtestPage from "./pages/speedtest";
 
 
@@ -23,7 +24,8 @@ function App() {
         <Route path="/blog" component={BlogPage} />
         <Route path="/blog/:slug" component={BlogPage} />
         <Route path="/contacts" component={ContactPage} />
-        <Route path="/vacancy" component={VacancyPage} />
+        <Route path="/vacancy" component={VacanciesPage} />
+        <Route path="/vacancy/:slug" component={VacancyPage} />
         <Route path="/speedtest" component={SpeedtestPage} />
         <Route component={NotFoundPage} />
       </Switch>
